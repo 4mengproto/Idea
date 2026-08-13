@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아이디어 제안서 시스템</title>
+    <!-- 이미지 변환용 html2canvas 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .top-bar { display: flex; justify-content: flex-end; margin-bottom: 15px; }
+        .btn-admin { background-color: #333; color: #fff; border: none; padding: 8px 16px; font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 4px; transition: background 0.3s; }
+        .btn-admin:hover { background-color: #555; }
+
+        .proposal-form { width: 100%; border-collapse: collapse; border: 2px solid #000; margin-bottom: 20px; table-layout: fixed; }
+        .proposal-form th, .proposal-form td { border: 1px solid #000; padding: 0; vertical-align: middle; }
+        .proposal-form th { background-color: #d9d9d9; font-weight: bold; text-align: center; padding: 10px; }
+        .proposal-form .header-title { font-size: 24px; font-weight: bold; text-align: center; background-color: #d9d9d9; padding: 15px; border-bottom: 2px solid #000; }
+
+        .proposal-form input[type="text"],
+        .proposal-form input[type="password"],
+        .proposal-form input[type="date"],
+        .proposal-form textarea {
+            width: 100%; height: 100%; border: none; padding: 10px; box-sizing: border-box; font-family: inherit; resize: vertical; background-color: transparent;
+        }
+        .proposal-form input:focus, .proposal-form textarea:focus { outline: 2px solid #4a90e2; outline-offset: -2px; }
+        .proposal-form input[readonly], .proposal-form textarea[readonly] { background-color: #f0f0f0; color: #555; outline: none; }
+
+        .content-cell { position: relative; }
+        .cell-tag { position: absolute; top: 0; left: 0; width: 10%; background-color: #d9d9d9; border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 10px 0; text-align: center; font-weight: bold; font-size: 14px; box-sizing: border-box; z-index: 1; }
+        .content-cell textarea { padding-top: 45px; padding-left: 15px; min-height: 200px; }
+        .content-cell .large-textarea { min-height: 400px; }
+
+        .proposal-form .nested-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .proposal-form .nested-table th, .proposal-form .nested-table td { border: none; border-right: 1px solid #000; }
+        .proposal-form .nested-table th:last-child, .proposal-form .nested-table td:last-child { border-right: none; }
+
+        .file-upload-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px dashed #4a90e2;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+        }
+
+        .button-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn-submit { flex: 2; padding: 15px; background-color: #4a90e2; color: white; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-submit:disabled { background-color: #999; cursor: not-allowed; }
+        .btn-print { flex: 1; padding: 15px; background-color: #27ae60; color: white; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; display: block; }
+        .btn-reset { flex: 1; padding: 15px; background-color: #e74c3c; color: white; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; display: block; } 
+        .btn-submit:hover:not(:disabled) { background-color: #357abd; }
+        .btn-print:hover { background-color: #2ecc71; }
+        .btn-reset:hover { background-color: #c0392b; }
+
+        .list-section { display: block; margin-top: 40px; border-top: 2px dashed #ccc; padding-top: 30px; }
+        .list-section h2 { text-align: center; margin-bottom: 20px; }
+        .proposal-list { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .proposal-list th, .proposal-list td { border: 1px solid #ddd; padding: 10px 6px; text-align: center; vertical-align: middle; }
+        .proposal-list th { background-color: #f8f9fa; font-weight: bold; }
+        .proposal-list tbody tr.item-row { cursor: pointer; transition: background-color 0.2s; }
+        .proposal-list tbody tr.item-row:hover { background-color: #e9ecef; }
+        .empty-message { text-align: center; padding: 20px; color: #888; }
+        
+        .btn-delete { background-color: #e74c3c; color: white; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px; border-radius: 3px; }
+        .btn-delete:hover { background-color: #c0392b; }
+        .btn-copy { background-color: #f39c12; color: white; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px; border-radius: 3px; margin-right: 3px; }
+        .btn-copy:hover { background-color: #d68910; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 25px; border-radius: 8px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .close-btn { position: absolute; right: 15px; top: 15px; font-size: 20px; cursor: pointer; color: #666; }
+        .modal h3 { margin-top: 0; text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        
+        .admin-modal-content { width: 450px; }
+        .admin-modal-content input[type="text"], .admin-modal-content input[type="password"] { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; }
+        
+        .modal-btn { width: 100%; padding: 10px; background-color: #333; color: white; border: none; font-weight: bold; cursor: pointer; margin-bottom: 10px; transition: 0.3s; }
+        .modal-btn:hover { background-color: #555; }
+        .admin-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
+        .admin-table th, .admin-table td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+        .btn-logout { background-color: #888; }
+        .hidden { display: none !important; }
+
+        .eval-modal-content { width: 800px; max-width: 95%; }
+        .eval-table { width: 100%; border-collapse: collapse; border: 1px solid #000; table-layout: fixed; text-align: center; }
+        .eval-table th, .eval-table td { border: 1px solid #000; padding: 0; vertical-align: middle; height: 40px; }
+        .eval-table th { background-color: #fff; font-size: 14px; font-weight: bold; }
+        .eval-table input[type="text"], .eval-table select { width: 100%; height: 100%; border: none; text-align: center; font-family: inherit; font-size: 13px; background: transparent; outline: none; padding: 5px; box-sizing: border-box; }
+        .eval-table select { text-align-last: center; cursor: pointer; }
+        .eval-table input[readonly] { background-color: #f9f9f9; }
+
+        #superAdminNotice {
+            display: none; 
+            text-align: center; 
+            padding: 100px 20px; 
+            color: #555; 
+            background-color: #fafafa; 
+            border: 2px dashed #ccc; 
+            border-radius: 8px; 
+            margin-bottom: 20px;
+        }
+
+        @media print {
+            body { background-color: #fff; padding: 0; }
+            .container { box-shadow: none; padding: 0; max-width: 100%; margin: 0; }
+            .top-bar, .file-upload-section, .button-group, .list-section, .modal, #superAdminNotice { display: none !important; }
+            .proposal-form input[type="text"], .proposal-form input[type="password"], .proposal-form input[type="date"], .proposal-form textarea { resize: none; overflow: visible; }
+            .content-cell textarea { min-height: 150px; } 
+            .content-cell .large-textarea { min-height: 300px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="top-bar">
+        <button class="btn-admin" id="btnOpenAdmin">관리자 모드</button>
+    </div>
+
+    <div id="superAdminNotice">
+        <h2>🔒 슈퍼관리자 모드 접속 중</h2>
+        <p style="margin-top: 15px; line-height: 1.6; font-size: 15px;">
+            슈퍼관리자는 제안서 열람 및 평가 권한이 제한되어 있습니다.<br>
+            우측 상단의 <b>[슈퍼관리자 계정관리]</b> 버튼을 클릭하여 일반 관리자 계정을 추가/삭제/관리해 주세요.
+        </p>
+    </div>
+
+    <form id="ideaForm">
+        <table class="proposal-form">
+            <tr>
+                <td colspan="6" class="header-title">아이디어 제안서</td>
+            </tr>
+            <tr>
+                <th style="width: 10%;">제목</th>
+                <td colspan="5">
+                    <input type="text" id="p_title" required placeholder="제안서 제목을 입력하세요">
+                </td>
+            </tr>
+            <tr>
+                <th style="width: 10%;">제안자</th>
+                <td style="width: 23.33%;">
+                    <input type="text" id="p_proposer" required placeholder="이름">
+                </td>
+                <th style="width: 10%;">비밀번호</th>
+                <td style="width: 23.33%;">
+                    <input type="password" id="p_password" required placeholder="본인확인용">
+                </td>
+                <th style="width: 10%;">제안일자</th>
+                <td style="width: 23.34%;">
+                    <input type="date" id="p_date" required>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6" class="content-cell">
+                    <div class="cell-tag">개선 전</div>
+                    <textarea id="p_before" required placeholder="개선 전 문제점 및 상황을 입력하세요"></textarea>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6" class="content-cell">
+                    <div class="cell-tag">개선 후</div>
+                    <textarea id="p_after" class="large-textarea" required placeholder="개선 후 기대되는 모습 및 해결책을 입력하세요"></textarea>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6" class="content-cell">
+                    <div class="cell-tag">개선효과</div>
+                    <textarea id="p_effect" required placeholder="구체적인 개선 효과를 입력하세요"></textarea>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6" style="padding: 0; border-bottom: none;">
+                    <table class="nested-table">
+                        <tr>
+                            <th style="width: 10%;">예상 투자비<br>(백만원)</th>
+                            <td style="width: 23.33%;">
+                                <input type="text" id="p_cost" placeholder="예: 50">
+                            </td>
+                            <th style="width: 10%;">시행기간</th>
+                            <td style="width: 23.33%;">
+                                <input type="text" id="p_period" placeholder="예: 3개월">
+                            </td>
+                            <th style="width: 10%;">기타</th>
+                            <td style="width: 23.34%;">
+                                <input type="text" id="p_etc" placeholder="특이사항 입력">
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+        
+        <div class="file-upload-section">
+            <strong style="font-size: 14px;">관련 문서 첨부: </strong>
+            <input type="file" id="p_file" style="margin-left: 10px; font-size: 14px;">
+            <div id="file_display" style="display:none; margin-top: 10px; font-size: 13px;">
+                ✓ 현재 등록된 파일: <a id="file_link" href="#" target="_blank" style="color: #4a90e2; text-decoration: underline; font-weight: bold;"></a>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button type="submit" class="btn-submit" id="mainSubmitBtn">제안서 등록하기</button>
+            <button type="button" class="btn-print" id="btnPrint" onclick="window.print()">인쇄하기</button>
+            <button type="button" class="btn-reset" id="btnReset" onclick="resetForm()">초기화 (새글쓰기)</button>
+        </div>
+    </form>
+
+    <div class="list-section" id="proposalListSection">
+        <h2>등록된 제안서 리스트</h2>
+        <table class="proposal-list">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">No</th>
+                    <th style="width: 22%;">제목</th>
+                    <th style="width: 10%;">제안자</th>
+                    <th style="width: 12%;">평가결과</th>
+                    <th style="width: 12%;">포상금</th>
+                    <th style="width: 11%;">제안일자</th>
+                    <th style="width: 11%;">지급일자</th>
+                    <th id="th_manage" style="width: 17%;">관리</th>
+                </tr>
+            </thead>
+            <tbody id="listBody">
+                <tr>
+                    <td colspan="8" class="empty-message">데이터를 불러오는 중입니다...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 관리자 로그인/관리 모달 -->
+<div id="adminModal" class="modal">
+    <div class="modal-content admin-modal-content">
+        <span class="close-btn" id="btnCloseAdmin">&times;</span>
+        
+        <div id="loginView">
+            <h3>관리자 로그인</h3>
+            <input type="text" id="loginId" placeholder="아이디">
+            <input type="password" id="loginPw" placeholder="비밀번호">
+            <button class="modal-btn" id="btnLogin">로그인</button>
+        </div>
+
+        <div id="manageView" class="hidden">
+            <h3 id="welcomeMessage" style="text-align: center; margin-bottom: 15px; font-size: 18px;">관리자 님 환영합니다.</h3>
+            
+            <div id="passwordChangeSection" style="margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; border: 1px solid #ddd;">
+                <h3 style="margin-top: 0; font-size: 15px; border-bottom: none; padding-bottom: 0;">내 비밀번호 변경</h3>
+                <input type="password" id="currentPw" placeholder="기존 비밀번호">
+                <input type="password" id="newPw" placeholder="새 비밀번호">
+                <input type="password" id="confirmNewPw" placeholder="새 비밀번호 확인">
+                <button class="modal-btn" id="btnChangePw" style="margin-bottom: 0;">비밀번호 변경하기</button>
+            </div>
+
+            <div id="superAdminSection">
+                <h3 style="margin-top: 20px; border-top: 2px dashed #333; padding-top: 15px; font-size: 16px;">일반 관리자 계정 관리</h3>
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>이름</th><th>아이디</th><th>연락처</th><th>E-mail</th><th>관리</th></tr>
+                    </thead>
+                    <tbody id="adminTableBody">
+                    </tbody>
+                </table>
+                <h4 style="margin-bottom: 10px; font-size: 14px;">새 일반 관리자 추가</h4>
+                <input type="text" id="newAdminName" placeholder="이름 (관리자명)">
+                <input type="text" id="newAdminId" placeholder="아이디">
+                <input type="password" id="newAdminPw" placeholder="비밀번호">
+                <input type="text" id="newAdminPhone" placeholder="연락처 (예: 010-1234-5678)">
+                <input type="text" id="newAdminEmail" placeholder="E-mail 주소">
+                <button class="modal-btn" id="btnAddAdmin">계정 등록</button>
+            </div>
+            
+            <button class="modal-btn btn-logout" id="btnLogout" style="margin-top: 15px;">로그아웃</button>
+        </div>
+    </div>
+</div>
+
+<!-- 심사결과 평가 모달 -->
+<div id="evalModal" class="modal">
+    <div class="modal-content eval-modal-content">
+        <span class="close-btn" id="btnCloseEval">&times;</span>
+        <h3 style="text-align: left; border:none; margin-bottom: 20px; margin-top: 0;">제안서 심사결과 입력</h3>
+        
+        <table class="eval-table">
+            <tr>
+                <th rowspan="2" style="width: 30%;">제목</th>
+                <th rowspan="2" style="width: 15%;">제안자</th>
+                <th colspan="2" style="width: 25%;">심사결과</th>
+                <th rowspan="2" style="width: 15%;">진행부서</th>
+                <th rowspan="2" style="width: 15%;">비고</th>
+            </tr>
+            <tr>
+                <th style="width: 12.5%;">결과</th>
+                <th style="width: 12.5%;">포상</th>
+            </tr>
+            <tr>
+                <td><input type="text" id="eval_title" readonly></td>
+                <td><input type="text" id="eval_proposer" readonly></td>
+                <td>
+                    <select id="eval_result">
+                        <option value="">선택</option>
+                        <option value="S등급">S등급</option>
+                        <option value="A등급">A등급</option>
+                        <option value="B등급">B등급</option>
+                        <option value="일반등급">일반등급</option>
+                        <option value="실행불가">실행불가</option>
+                    </select>
+                </td>
+                <td><input type="text" id="eval_reward" placeholder="자동입력" readonly></td>
+                <td><input type="text" id="eval_dept"></td>
+                <td><input type="text" id="eval_note" placeholder="예: 즉시시행"></td>
+            </tr>
+        </table>
+        
+        <div style="margin-top: 15px; font-weight: bold; font-size: 14px; text-align: left; display: flex; align-items: center; gap: 10px;">
+            - 포상금 지급일 : 
+            <input type="date" id="eval_date" style="border: none; border-bottom: 1px solid #000; outline: none; padding: 2px; font-family: inherit; cursor: pointer;">
+        </div>
+        <button class="modal-btn" id="btnSaveEval" style="margin-top: 30px; font-size: 16px;">심사결과 저장하기</button>
+    </div>
+</div>
+
+<!-- ★ 이미지를 클립보드로 복사하기 위한 프리뷰 모달 -->
+<div id="snapshotModal" class="modal">
+    <div class="modal-content" style="width: 520px; text-align: center;">
+        <span class="close-btn" id="btnCloseSnapshot">&times;</span>
+        <h3 style="border-bottom: 2px solid #333; padding-bottom: 10px;">제안서 심사결과 카드 (이미지 복사)</h3>
+        
+        <!-- 이 영역이 이미지로 렌더링되어 클립보드에 복사됩니다 -->
+        <div id="snapshotCard" style="border: 2px solid #333; padding: 25px; background: #fff; text-align: left; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 14px; line-height: 1.8;">
+            <!-- 동적 삽입 영역 -->
+        </div>
+        
+        <button class="modal-btn" id="btnCopyImageToClipboard">이미지 형태로 클립보드 복사</button>
+    </div>
+</div>
+
+<!-- Firebase Modular SDK -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js"; 
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBRwg3k5usuMkBXH9LB6T-9Uuw9ZU1TBMs",
+        authDomain: "formeng-7c4b3.firebaseapp.com",
+        databaseURL: "https://formeng-7c4b3-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "formeng-7c4b3",
+        storageBucket: "formeng-7c4b3.firebasestorage.app",
+        messagingSenderId: "745402830490",
+        appId: "1:745402830490:web:a02eabf45c3f83ebb8d923"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app); 
+
+    let proposals = [];
+    let admins = [];
+    let isAdminLoggedIn = false;
+    let isSuperAdmin = false;
+    let loggedInAdmin = null; 
+    let currentEditingId = null;
+
+    const listSection = document.getElementById('proposalListSection');
+    const ideaForm = document.getElementById('ideaForm');
+    const superAdminNotice = document.getElementById('superAdminNotice');
+    
+    const adminModal = document.getElementById('adminModal');
+    const evalModal = document.getElementById('evalModal');
+    const snapshotModal = document.getElementById('snapshotModal'); 
+    const loginView = document.getElementById('loginView');
+    const manageView = document.getElementById('manageView');
+    const btnOpenAdmin = document.getElementById('btnOpenAdmin');
+    const mainSubmitBtn = document.getElementById('mainSubmitBtn');
+    const btnPrint = document.getElementById('btnPrint');
+    const btnReset = document.getElementById('btnReset');
+
+    function getSuperAdminPw() {
+        return localStorage.getItem('superAdminPw') || '140916Open@';
+    }
+
+    onSnapshot(collection(db, "admins"), (snapshot) => {
+        let tempAdmins = [];
+        snapshot.forEach(doc => { tempAdmins.push({ docId: doc.id, ...doc.data() }); });
+        admins = tempAdmins;
+        if (isAdminLoggedIn && isSuperAdmin) renderAdminList();
+    });
+
+    const q = query(collection(db, "proposals"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (snapshot) => {
+        proposals = [];
+        snapshot.forEach(doc => {
+            proposals.push({ id: doc.id, ...doc.data() });
+        });
+        renderProposalList(); 
+    });
+
+    function setFormState(isReadonly) {
+        const inputs = document.querySelectorAll('#ideaForm input[type="text"], #ideaForm input[type="password"], #ideaForm input[type="date"], #ideaForm textarea');
+        inputs.forEach(input => { input.readOnly = isReadonly; });
+    }
+
+    window.resetForm = function() {
+        document.getElementById('ideaForm').reset();
+        currentEditingId = null;
+        document.getElementById('p_date').value = new Date().toISOString().substring(0, 10);
+        
+        document.getElementById('p_file').value = '';
+        document.getElementById('file_display').style.display = 'none';
+        
+        if (!isAdminLoggedIn) {
+            mainSubmitBtn.innerText = '제안서 등록하기';
+            setFormState(false); 
+        }
+    };
+
+    ideaForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        mainSubmitBtn.disabled = true;
+        mainSubmitBtn.innerText = "데이터 처리 중...";
+
+        const proposalData = {
+            title: document.getElementById('p_title').value,
+            proposer: document.getElementById('p_proposer').value,
+            date: document.getElementById('p_date').value,
+            before: document.getElementById('p_before').value,
+            after: document.getElementById('p_after').value,
+            effect: document.getElementById('p_effect').value,
+            cost: document.getElementById('p_cost').value || '-',
+            period: document.getElementById('p_period').value || '-',
+            etc: document.getElementById('p_etc').value || '-'
+        };
+        const pwd = document.getElementById('p_password').value;
+
+        try {
+            let fileUrl = null;
+            let fileName = null;
+
+            if (currentEditingId) {
+                const existing = proposals.find(p => p.id === currentEditingId);
+                if (existing) {
+                    fileUrl = existing.fileUrl || null;
+                    fileName = existing.fileName || null;
+                }
+            }
+
+            const fileInput = document.getElementById('p_file');
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const storageRef = ref(storage, 'proposals/' + new Date().getTime() + '_' + file.name);
+                await uploadBytes(storageRef, file);
+                fileUrl = await getDownloadURL(storageRef);
+                fileName = file.name;
+            }
+
+            proposalData.fileUrl = fileUrl;
+            proposalData.fileName = fileName;
+
+            if (isAdminLoggedIn) {
+                if (!currentEditingId) {
+                    alert('아래 리스트에서 평가할 제안서를 선택해주세요.');
+                    mainSubmitBtn.disabled = false;
+                    mainSubmitBtn.innerText = '제안서 평가하기';
+                    return;
+                }
+                const p = proposals.find(p => p.id === currentEditingId);
+                
+                const docRef = doc(db, "proposals", currentEditingId);
+                await updateDoc(docRef, proposalData);
+                openEvalModal({ ...p, ...proposalData });
+            } else {
+                if (!currentEditingId) {
+                    await addDoc(collection(db, "proposals"), {
+                        password: pwd,
+                        timestamp: new Date().getTime(),
+                        ...proposalData
+                    });
+                    alert('제안서가 등록되었습니다.');
+                    resetForm();
+                } else {
+                    const docRef = doc(db, "proposals", currentEditingId);
+                    await updateDoc(docRef, proposalData);
+                    alert('제안서가 수정되었습니다.');
+                    resetForm();
+                }
+            }
+        } catch (error) {
+            console.error("Error saving document: ", error);
+            alert("처리 중 서버 오류가 발생했습니다.");
+        } finally {
+            mainSubmitBtn.disabled = false;
+            mainSubmitBtn.innerText = isAdminLoggedIn ? (currentEditingId ? "제안서 평가하기" : "제안서 등록하기") : (currentEditingId ? "제안서 수정하기" : "제안서 등록하기");
+        }
+    });
+
+    window.viewProposal = function(id) {
+        const p = proposals.find(x => x.id === id);
+        if(!p) return;
+        
+        if (!isAdminLoggedIn) {
+            const inputPwd = prompt("작성 시 입력했던 비밀번호를 입력해주세요.");
+            if (inputPwd === null) return; 
+            if (inputPwd !== p.password) {
+                alert("비밀번호가 일치하지 않습니다.");
+                return;
+            }
+        }
+
+        document.getElementById('p_title').value = p.title;
+        document.getElementById('p_proposer').value = p.proposer;
+        document.getElementById('p_date').value = p.date || '';
+        document.getElementById('p_before').value = p.before || '';
+        document.getElementById('p_after').value = p.after || '';
+        document.getElementById('p_effect').value = p.effect || '';
+        document.getElementById('p_cost').value = p.cost !== '-' ? p.cost : '';
+        document.getElementById('p_period').value = p.period !== '-' ? p.period : '';
+        document.getElementById('p_etc').value = p.etc !== '-' ? p.etc : '';
+        document.getElementById('p_password').value = p.password || ''; 
+        
+        if (p.fileUrl) {
+            document.getElementById('file_display').style.display = 'block';
+            const fileLink = document.getElementById('file_link');
+            fileLink.href = p.fileUrl;
+            fileLink.innerText = p.fileName;
+        } else {
+            document.getElementById('file_display').style.display = 'none';
+        }
+        
+        currentEditingId = id;
+        
+        if (!isAdminLoggedIn) mainSubmitBtn.innerText = '제안서 수정하기';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.deleteProposal = async function(id, event) {
+        event.stopPropagation();
+        if (confirm('해당 제안서를 삭제하시겠습니까?')) {
+            try {
+                await deleteDoc(doc(db, "proposals", id));
+                if (currentEditingId === id) resetForm();
+                alert('제안서가 삭제되었습니다.');
+            } catch(e) {
+                alert('삭제 중 오류가 발생했습니다.');
+            }
+        }
+    };
+
+    window.openSnapshotModal = function(id, event) {
+        event.stopPropagation();
+        const p = proposals.find(x => x.id === id);
+        if (!p) return;
+
+        const card = document.getElementById('snapshotCard');
+        card.innerHTML = `
+            <div style="border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; font-weight: bold; font-size: 16px; text-align: center;">[ 아이디어 제안서 심사결과 요약 ]</div>
+            <p style="margin: 8px 0;"><b>[제목]:</b> ${p.title || '-'}</p>
+            <p style="margin: 8px 0;"><b>[제안자]:</b> ${p.proposer || '-'}</p>
+            <p style="margin: 8px 0;"><b>[제안일자]:</b> ${p.date || '-'}</p>
+            <p style="margin: 8px 0;"><b>[지급일자]:</b> ${p.eval_date || '-'}</p>
+            <hr style="border: 0; border-top: 1px solid #ccc; margin: 12px 0;">
+            <p style="margin: 8px 0;"><b>[심사 결과]:</b> <span style="color: blue; font-weight: bold;">${p.eval_result || '-'}</span></p>
+            <p style="margin: 8px 0;"><b>[포상금]:</b> ${p.eval_reward || '-'}</p>
+            <p style="margin: 8px 0;"><b>[진행 부서]:</b> ${p.eval_dept || '-'}</p>
+            <p style="margin: 8px 0;"><b>[비고]:</b> ${p.eval_note || '-'}</p>
+        `;
+        snapshotModal.style.display = 'block';
+    };
+
+    document.getElementById('btnCloseSnapshot').addEventListener('click', () => {
+        snapshotModal.style.display = 'none';
+    });
+
+    // ★ 카드를 이미지로 변환하여 클립보드에 복사
+    document.getElementById('btnCopyImageToClipboard').addEventListener('click', () => {
+        const cardElement = document.getElementById('snapshotCard');
+        
+        html2canvas(cardElement, { scale: 2 }).then(canvas => {
+            canvas.toBlob(blob => {
+                try {
+                    const item = new ClipboardItem({ 'image/png': blob });
+                    navigator.clipboard.write([item]).then(() => {
+                        alert('심사결과 카드가 이미지 형태로 클립보드에 복사되었습니다!\n(카카오톡이나 문서에 Ctrl + V 로 붙여넣기 하세요)');
+                        snapshotModal.style.display = 'none';
+                    }).catch(err => {
+                        console.error(err);
+                        alert('클립보드 복사 권한이 거부되었거나 지원하지 않는 브라우저입니다.');
+                    });
+                } catch (err) {
+                    console.error(err);
+                    alert('현재 브라우저 환경에서 이미지 클립보드 복사를 지원하지 않습니다.');
+                }
+            }, 'image/png');
+        }).catch(err => {
+            console.error(err);
+            alert('이미지 생성 중 오류가 발생했습니다.');
+        });
+    });
+
+    function renderProposalList() {
+        const tbody = document.getElementById('listBody');
+        tbody.innerHTML = ''; 
+        
+        document.getElementById('th_manage').style.display = isAdminLoggedIn ? 'table-cell' : 'none';
+
+        if (proposals.length === 0) {
+            const colspanVal = isAdminLoggedIn ? 8 : 7;
+            tbody.innerHTML = `<tr><td colspan="${colspanVal}" class="empty-message">등록된 제안서가 없습니다.</td></tr>`;
+            return;
+        }
+        
+        proposals.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.className = 'item-row';
+            tr.setAttribute('onclick', `viewProposal('${item.id}')`);
+            
+            let titleText = item.title;
+            let resultText = item.eval_result ? `<span style="color:blue;font-weight:bold;">${item.eval_result}</span>` : '<span style="color:#888;">심사대기</span>';
+            let rewardText = item.eval_reward ? `<span style="font-weight:bold;">${item.eval_reward}</span>` : '<span style="color:#888;">-</span>';
+            let dateText = item.date || '-';
+            let payDateText = item.eval_date || '-';
+
+            if (!isAdminLoggedIn) {
+                titleText = "🔒 비밀글입니다. (클릭하여 본인 확인)";
+                resultText = "***";
+                rewardText = "***";
+            }
+
+            const totalCount = proposals.length;
+            
+            let manageBtnHtml = '';
+            if (isAdminLoggedIn) {
+                let copyBtnHtml = '';
+                if (item.eval_result) {
+                    copyBtnHtml = `<button class="btn-copy" onclick="openSnapshotModal('${item.id}', event)">복사(사진)</button>`;
+                }
+                let deleteBtnHtml = `<button class="btn-delete" onclick="deleteProposal('${item.id}', event)">삭제</button>`;
+                manageBtnHtml = `<td>${copyBtnHtml}${deleteBtnHtml}</td>`;
+            }
+
+            tr.innerHTML = `
+                <td>${totalCount - index}</td>
+                <td style="text-align: left; padding-left: 10px;">${titleText}</td>
+                <td>${item.proposer}</td>
+                <td>${resultText}</td>
+                <td>${rewardText}</td>
+                <td>${dateText}</td>
+                <td>${payDateText}</td>
+                ${manageBtnHtml}
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* === 평가 모달 === */
+    document.getElementById('eval_result').addEventListener('change', function() {
+        const rewardInput = document.getElementById('eval_reward');
+        switch (this.value) {
+            case 'S등급': rewardInput.value = '100만원'; break;
+            case 'A등급': rewardInput.value = '30만원'; break;
+            case 'B등급': rewardInput.value = '10만원'; break;
+            case '일반등급': rewardInput.value = '3만원'; break;
+            case '실행불가': rewardInput.value = '1만원'; break;
+            default: rewardInput.value = ''; break;
+        }
+    });
+
+    function openEvalModal(p) {
+        evalModal.style.display = 'block';
+        document.getElementById('eval_title').value = p.title || '';
+        document.getElementById('eval_proposer').value = p.proposer || '';
+        document.getElementById('eval_result').value = p.eval_result || '';
+        document.getElementById('eval_reward').value = p.eval_reward || '';
+        document.getElementById('eval_dept').value = p.eval_dept || '';
+        document.getElementById('eval_note').value = p.eval_note || '';
+        document.getElementById('eval_date').value = p.eval_date || '';
+    }
+
+    document.getElementById('btnCloseEval').addEventListener('click', () => evalModal.style.display = 'none');
+
+    document.getElementById('btnSaveEval').addEventListener('click', async () => {
+        if (!currentEditingId) return;
+        try {
+            const docRef = doc(db, "proposals", currentEditingId);
+            await updateDoc(docRef, {
+                eval_result: document.getElementById('eval_result').value,
+                eval_reward: document.getElementById('eval_reward').value,
+                eval_dept: document.getElementById('eval_dept').value,
+                eval_note: document.getElementById('eval_note').value,
+                eval_date: document.getElementById('eval_date').value
+            });
+            alert('제안서 심사결과가 저장되었습니다.');
+            evalModal.style.display = 'none';
+        } catch(e) { alert('오류가 발생했습니다.'); }
+    });
+
+    /* === 관리자 제어 === */
+    btnOpenAdmin.addEventListener('click', () => { adminModal.style.display = 'block'; updateModalUI(); });
+    document.getElementById('btnCloseAdmin').addEventListener('click', () => adminModal.style.display = 'none');
+    window.addEventListener('click', (e) => {
+        if (e.target === adminModal) adminModal.style.display = 'none';
+        if (e.target === evalModal) evalModal.style.display = 'none';
+        if (e.target === snapshotModal) snapshotModal.style.display = 'none';
+    });
+
+    function updateModalUI() {
+        if (isAdminLoggedIn) {
+            loginView.classList.add('hidden');
+            manageView.classList.remove('hidden');
+            
+            if (isSuperAdmin) {
+                btnOpenAdmin.innerText = '슈퍼관리자 계정관리';
+                document.getElementById('superAdminSection').style.display = 'block';
+                document.getElementById('welcomeMessage').innerText = '슈퍼관리자 님 환영합니다.\n(아래에서 관리자 계정 권한만 관리 가능합니다)';
+                
+                ideaForm.style.display = 'none';
+                listSection.style.display = 'none';
+                superAdminNotice.style.display = 'block';
+                
+                renderAdminList();
+            } else {
+                btnOpenAdmin.innerText = '관리자 모드 (로그아웃)';
+                document.getElementById('superAdminSection').style.display = 'none';
+                document.getElementById('welcomeMessage').innerText = '일반 관리자 님 환영합니다.';
+                
+                ideaForm.style.display = 'block';
+                listSection.style.display = 'block';
+                superAdminNotice.style.display = 'none';
+                
+                mainSubmitBtn.style.display = 'block';
+                mainSubmitBtn.innerText = '제안서 평가하기';
+                btnReset.style.display = 'none'; 
+                
+                setFormState(true); 
+                renderProposalList();
+            }
+        } else {
+            loginView.classList.remove('hidden');
+            manageView.classList.add('hidden');
+            btnOpenAdmin.innerText = '관리자 모드';
+            
+            ideaForm.style.display = 'block';
+            listSection.style.display = 'block'; 
+            superAdminNotice.style.display = 'none';
+            
+            mainSubmitBtn.style.display = 'block';
+            mainSubmitBtn.innerText = '제안서 등록하기';
+            btnReset.style.display = 'block';
+            
+            setFormState(false); 
+            resetForm();
+            renderProposalList();
+        }
+    }
+
+    document.getElementById('btnLogin').addEventListener('click', () => {
+        const id = document.getElementById('loginId').value.trim();
+        const pw = document.getElementById('loginPw').value.trim();
+        
+        const currentSuperAdminPw = getSuperAdminPw();
+
+        if (id === 'admin' && pw === currentSuperAdminPw) {
+            isAdminLoggedIn = true;
+            isSuperAdmin = true;
+            loggedInAdmin = { id: 'admin', pw: currentSuperAdminPw, name: '슈퍼관리자' }; 
+            
+            document.getElementById('loginId').value = '';
+            document.getElementById('loginPw').value = '';
+            updateModalUI(); 
+            adminModal.style.display = 'none'; 
+            return;
+        }
+
+        const user = admins.find(a => a.id === id && a.pw === pw);
+        if (user) {
+            isAdminLoggedIn = true;
+            isSuperAdmin = false;
+            loggedInAdmin = user; 
+            
+            document.getElementById('loginId').value = '';
+            document.getElementById('loginPw').value = '';
+            updateModalUI(); 
+            adminModal.style.display = 'none'; 
+            alert(`환영합니다, ${user.name} 일반 관리자님.`);
+        } else {
+            alert('아이디 또는 비밀번호가 일치하지 않습니다.');
+        }
+    });
+
+    document.getElementById('btnChangePw').addEventListener('click', async () => {
+        const currentPw = document.getElementById('currentPw').value;
+        const newPw = document.getElementById('newPw').value;
+        const confirmNewPw = document.getElementById('confirmNewPw').value;
+
+        if (!currentPw || !newPw || !confirmNewPw) return alert('모든 항목을 입력해주세요.');
+        if (currentPw !== loggedInAdmin.pw) return alert('기존 비밀번호가 일치하지 않습니다.');
+        if (newPw !== confirmNewPw) return alert('새 비밀번호가 일치하지 않습니다.');
+
+        if (isSuperAdmin) {
+            localStorage.setItem('superAdminPw', newPw);
+            loggedInAdmin.pw = newPw;
+            alert('슈퍼관리자 비밀번호가 성공적으로 변경되었습니다.');
+        } else {
+            try {
+                const docRef = doc(db, "admins", loggedInAdmin.docId);
+                await updateDoc(docRef, { pw: newPw });
+                loggedInAdmin.pw = newPw;
+                alert('비밀번호가 성공적으로 변경되었습니다.');
+            } catch (error) {
+                console.error(error);
+                alert('비밀번호 변경 중 오류가 발생했습니다.');
+                return;
+            }
+        }
+
+        document.getElementById('currentPw').value = '';
+        document.getElementById('newPw').value = '';
+        document.getElementById('confirmNewPw').value = '';
+    });
+
+    document.getElementById('btnLogout').addEventListener('click', () => {
+        isAdminLoggedIn = false;
+        isSuperAdmin = false;
+        loggedInAdmin = null;
+        updateModalUI();
+        adminModal.style.display = 'none';
+    });
+
+    document.getElementById('btnAddAdmin').addEventListener('click', async () => {
+        const name = document.getElementById('newAdminName').value.trim();
+        const id = document.getElementById('newAdminId').value.trim();
+        const pw = document.getElementById('newAdminPw').value.trim();
+        const phone = document.getElementById('newAdminPhone').value.trim();
+        const email = document.getElementById('newAdminEmail').value.trim();
+
+        if (!name || !id || !pw || !phone || !email) return alert('모든 정보를 입력해주세요.');
+        if (admins.find(a => a.id === id) || id === 'admin') return alert('이미 존재하는 아이디입니다.');
+
+        try {
+            await addDoc(collection(db, "admins"), { name, id, pw, phone, email });
+            document.getElementById('newAdminName').value = '';
+            document.getElementById('newAdminId').value = '';
+            document.getElementById('newAdminPw').value = '';
+            document.getElementById('newAdminPhone').value = '';
+            document.getElementById('newAdminEmail').value = '';
+            alert('일반 관리자 계정이 추가되었습니다.');
+        } catch (error) {
+            console.error("관리자 계정 추가 오류:", error);
+            alert("계정 저장 중 오류가 발생했습니다.");
+        }
+    });
+
+    function renderAdminList() {
+        const tbody = document.getElementById('adminTableBody');
+        tbody.innerHTML = '';
+        
+        const superTr = document.createElement('tr');
+        superTr.innerHTML = `<td>슈퍼관리자</td><td>admin</td><td>-</td><td>-</td><td><span style="color: #888; font-size:12px;">최고 권한</span></td>`;
+        tbody.appendChild(superTr);
+
+        admins.forEach((admin) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${admin.name}</td>
+                <td>${admin.id}</td>
+                <td>${admin.phone || '-'}</td>
+                <td>${admin.email || '-'}</td>
+                <td><button class="btn-delete" onclick="deleteAdmin('${admin.docId}')">삭제</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    window.deleteAdmin = async function(docId) {
+        if (confirm(`일반 관리자 계정을 삭제하시겠습니까?`)) {
+            await deleteDoc(doc(db, "admins", docId));
+        }
+    };
+
+    resetForm();
+    updateModalUI();
+</script>
+</body>
+</html>
