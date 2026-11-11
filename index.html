@@ -133,7 +133,6 @@
 <body>
 
 <div class="container">
-    <!-- 상단 바: 좌측 홈 버튼, 우측 관리자 모드 버튼 -->
     <div class="top-bar">
         <a href="https://4mengproto.github.io/Total-reserve/" class="btn-home">홈으로</a>
         <button class="btn-admin" id="btnOpenAdmin">관리자 모드</button>
@@ -348,7 +347,6 @@
         <span class="close-btn" id="btnCloseSnapshot">&times;</span>
         <h3 style="border-bottom: 2px solid #333; padding-bottom: 10px;">제안서 심사결과 카드 (이미지 복사)</h3>
         
-        <!-- 이 영역이 이미지로 렌더링되어 클립보드에 복사됩니다 -->
         <div id="snapshotCard" style="border: 2px solid #333; padding: 25px; background: #fff; text-align: left; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 14px; line-height: 1.8;">
             <!-- 동적 삽입 영역 -->
         </div>
@@ -361,21 +359,18 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js"; 
+    // 구글 드라이브 업로드 사용으로 firebase-storage 관련 코드는 제거함
 
-    // ★ storageBucket 주소를 올바르게 수정함 (.appspot.com)
     const firebaseConfig = {
         apiKey: "AIzaSyBRwg3k5usuMkBXH9LB6T-9Uuw9ZU1TBMs",
         authDomain: "formeng-7c4b3.firebaseapp.com",
         projectId: "formeng-7c4b3",
-        storageBucket: "formeng-7c4b3.appspot.com",
         messagingSenderId: "745402830490",
         appId: "1:745402830490:web:a02eabf45c3f83ebb8d923"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const storage = getStorage(app); 
 
     let proposals = [];
     let admins = [];
@@ -469,16 +464,41 @@
             }
 
             const fileInput = document.getElementById('p_file');
+            
+            // ★ 구글 드라이브(Apps Script) 업로드 로직 적용
             if (fileInput.files.length > 0) {
                 const file = fileInput.files[0];
-                const storageRef = ref(storage, 'proposals/' + new Date().getTime() + '_' + file.name);
-                await uploadBytes(storageRef, file);
-                fileUrl = await getDownloadURL(storageRef);
                 fileName = file.name;
+                
+                // 파일을 Base64로 인코딩하여 구글 스크립트로 전송
+                const reader = new FileReader();
+                const fileData = await new Promise((resolve) => {
+                    reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+                    reader.readAsDataURL(file);
+                });
+
+                mainSubmitBtn.innerText = "파일 업로드 중 (구글 드라이브)...";
+                
+                const gasUrl = "https://script.google.com/macros/s/AKfycbz6RFyy4DpAh53hahUzqNzZ2Mc6sdle2YX_AZmOxWh-6eU0c-yBh47FXDY4FmI-po5k/exec";
+                
+                const response = await fetch(gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `fileName=${encodeURIComponent(file.name)}&mimeType=${encodeURIComponent(file.type)}&fileData=${encodeURIComponent(fileData)}`
+                });
+                
+                const resultUrl = await response.text();
+                
+                if (resultUrl.startsWith("Error")) {
+                    throw new Error(resultUrl);
+                }
+                fileUrl = resultUrl;
             }
 
             proposalData.fileUrl = fileUrl;
             proposalData.fileName = fileName;
+
+            mainSubmitBtn.innerText = "DB 저장 중...";
 
             if (isAdminLoggedIn) {
                 if (!currentEditingId) {
@@ -510,7 +530,7 @@
             }
         } catch (error) {
             console.error("Error saving document: ", error);
-            alert("처리 중 서버 오류가 발생했습니다. (Storage 규칙 확인 필요)");
+            alert("처리 중 서버 오류가 발생했습니다.");
         } finally {
             mainSubmitBtn.disabled = false;
             mainSubmitBtn.innerText = isAdminLoggedIn ? (currentEditingId ? "제안서 평가하기" : "제안서 등록하기") : (currentEditingId ? "제안서 수정하기" : "제안서 등록하기");
@@ -594,7 +614,7 @@
         snapshotModal.style.display = 'none';
     });
 
-    // 이미지를 클립보드로 복사
+    // 카드를 이미지로 변환하여 클립보드에 복사
     document.getElementById('btnCopyImageToClipboard').addEventListener('click', () => {
         const cardElement = document.getElementById('snapshotCard');
         
