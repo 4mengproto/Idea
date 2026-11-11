@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>아이디어 제안서 시스템</title>
+    <!-- 이미지 변환용 html2canvas 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body {
@@ -132,6 +133,7 @@
 <body>
 
 <div class="container">
+    <!-- 상단 바: 좌측 홈 버튼, 우측 관리자 모드 버튼 -->
     <div class="top-bar">
         <a href="https://4mengproto.github.io/Total-reserve/" class="btn-home">홈으로</a>
         <button class="btn-admin" id="btnOpenAdmin">관리자 모드</button>
@@ -249,6 +251,7 @@
     </div>
 </div>
 
+<!-- 관리자 로그인/관리 모달 -->
 <div id="adminModal" class="modal">
     <div class="modal-content admin-modal-content">
         <span class="close-btn" id="btnCloseAdmin">&times;</span>
@@ -294,6 +297,7 @@
     </div>
 </div>
 
+<!-- 심사결과 평가 모달 -->
 <div id="evalModal" class="modal">
     <div class="modal-content eval-modal-content">
         <span class="close-btn" id="btnCloseEval">&times;</span>
@@ -338,28 +342,33 @@
     </div>
 </div>
 
+<!-- 이미지를 클립보드로 복사하기 위한 프리뷰 모달 -->
 <div id="snapshotModal" class="modal">
     <div class="modal-content" style="width: 520px; text-align: center;">
         <span class="close-btn" id="btnCloseSnapshot">&times;</span>
         <h3 style="border-bottom: 2px solid #333; padding-bottom: 10px;">제안서 심사결과 카드 (이미지 복사)</h3>
         
+        <!-- 이 영역이 이미지로 렌더링되어 클립보드에 복사됩니다 -->
         <div id="snapshotCard" style="border: 2px solid #333; padding: 25px; background: #fff; text-align: left; margin: 20px 0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 14px; line-height: 1.8;">
-            </div>
+            <!-- 동적 삽입 영역 -->
+        </div>
         
         <button class="modal-btn" id="btnCopyImageToClipboard">이미지 형태로 클립보드 복사</button>
     </div>
 </div>
 
+<!-- Firebase Modular SDK -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js"; 
 
+    // ★ storageBucket 주소를 올바르게 수정함 (.appspot.com)
     const firebaseConfig = {
         apiKey: "AIzaSyBRwg3k5usuMkBXH9LB6T-9Uuw9ZU1TBMs",
         authDomain: "formeng-7c4b3.firebaseapp.com",
         projectId: "formeng-7c4b3",
-        storageBucket: "formeng-7c4b3.firebasestorage.app",
+        storageBucket: "formeng-7c4b3.appspot.com",
         messagingSenderId: "745402830490",
         appId: "1:745402830490:web:a02eabf45c3f83ebb8d923"
     };
@@ -501,7 +510,7 @@
             }
         } catch (error) {
             console.error("Error saving document: ", error);
-            alert("처리 중 서버 오류가 발생했습니다.");
+            alert("처리 중 서버 오류가 발생했습니다. (Storage 규칙 확인 필요)");
         } finally {
             mainSubmitBtn.disabled = false;
             mainSubmitBtn.innerText = isAdminLoggedIn ? (currentEditingId ? "제안서 평가하기" : "제안서 등록하기") : (currentEditingId ? "제안서 수정하기" : "제안서 등록하기");
@@ -585,6 +594,7 @@
         snapshotModal.style.display = 'none';
     });
 
+    // 이미지를 클립보드로 복사
     document.getElementById('btnCopyImageToClipboard').addEventListener('click', () => {
         const cardElement = document.getElementById('snapshotCard');
         
